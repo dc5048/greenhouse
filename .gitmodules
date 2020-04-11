@@ -1,0 +1,3 @@
+[submodule "RaspberryPI_HTU21DF"]
+	path = RaspberryPI_HTU21DF
+	url = https://github.com/dalexgray/RaspberryPI_HTU21DF.git
