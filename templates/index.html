@@ -1,0 +1,26 @@
+<html>
+<head>
+	<title>Greenhouse Control</title>
+</head>
+<body>
+	<h1>Greenhouse and Garden Control<h1>
+	<h2>The temperature in the greenhouse is {{ temp }} 
+		degrees C</h2>
+	<h2>That's {{ '%0.2f' % ((temp|float) * 9/5 + 32) }} F for you heathens<h2>
+	<h2>The relative humidity is {{ humi }} % </h2>
+	<h2>Latest controller message: {{ msg }} </h2>
+	<br>
+	<form action="/water" method="post">
+		Water raised beds for
+		<input type="number" name="raisedbedstime" value=0> minutes.
+		<br>
+		Water greenhouse for
+		<input type="number" name="greenhousetime" value=0> minutes.
+		<br>
+		Water orchard for
+		<input type="number" name="orchardtime" value=0> minutes.
+		<br>
+		<input type="submit" value="Start"> 
+	</form>
+</body>
+</html>

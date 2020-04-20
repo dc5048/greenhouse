@@ -9,6 +9,7 @@ from multiprocessing import Process
 from shutil import chown
 import matplotlib.pyplot as plt
 from matplotlib.dates import date2num
+import threading
 
 
 class greenhouse:
@@ -27,14 +28,19 @@ class greenhouse:
     VERBOSE = True
     INIT = False
 
+    # Threading
+    LOCK = threading.Lock()
+
     def runHourlyCronJob(self):
         """ actions to be performed when called by cron on hourly basis"""
         self.VERBOSE = False  # be silent!
-        self.initBoard()
         t = datetime.now()
         if t.hour == 6:  # or t.hour == 18:
-            self.openSingleValveOnTimer(self.RAISED_BEDS, 2*60)
-            # self.openSingleValveOnTimer(self.GREENHOUSE, 2*60)
+            self.openSingleValveOnTimer(self.RAISED_BEDS, 30*60)
+            self.openSingleValveOnTimer(self.GREENHOUSE, 2*60)
+            if t.day % 2 == 1:
+                self.openSingleValveOnTimer(self.ORCHARD, 30*60)
+
         self.logReading()  # do this last so failure won't prevent watering
 
     def initBoard(self):
@@ -47,30 +53,70 @@ class greenhouse:
 
     def openSingleValve(self, valve):
         """ Open single valve, close all others
-
         valve: a valve number, see class constants for aliases
 
-        To close all valves set 'valve' to zero"""
+        To close all valves, use closeValves, which also performs cleanup
+        actions """
+        if not self.INIT:
+            self.initBoard()
         GPIO.setmode(GPIO.BCM)  # This matches PIGPIO
         GPIO.output(self.VALVE_1, valve == self.VALVE_1)
         GPIO.output(self.VALVE_2, valve == self.VALVE_2)
         GPIO.output(self.VALVE_3, valve == self.VALVE_3)
         self.logValveCommand(valve)
 
+    def closeValves(self):
+        """ Close all the valves and cleanup the IO"""
+        GPIO.setmode(GPIO.BCM)  # This matches PIGPIO
+        GPIO.output(self.VALVE_1, 0)
+        GPIO.output(self.VALVE_2, 0)
+        GPIO.output(self.VALVE_3, 0)
+        GPIO.cleanup()
+        self.INIT = False
+
     def openSingleValveOnTimer(self, valve, nSeconds):
-        """ Open single valve, close all others, close after timer expires
+        ''' Open single valve, close all others, close after timer expires
+        if called multiple times, will execute the calls sequentially
 
         valve: a valve number, see class constants for aliases
         nSeconds: the number of seconds to remain open
 
         Example: g.openSingleValveOnTimer(g.GREENHOUSE,3*60)
-        Opens the greenhouse watering valve for 3 minutes"""
-        GPIO.setmode(GPIO.BCM)  # This matches PIGPIO
-        self.openSingleValve(valve)
-        sleep(nSeconds)
-        self.openSingleValve(0)  # close all valves
-        if self.VERBOSE is True:
-            print('time complete')
+        Opens the greenhouse watering valve for 3 minutes'''
+        t1 = threading.Thread(target=self.__timerthread__,
+                              args=(valve, nSeconds),
+                              name='water')
+        t1.start()
+
+    def __timerthread__(self, valve, nSeconds):
+        ''' Excecute the valve-on-timer functionality in a locked thread,
+        this causes multiple "open" calls to be executed sequentially, as
+        the lock gets released'''
+        with self.LOCK:
+            GPIO.setmode(GPIO.BCM)  # This matches PIGPIO
+            self.openSingleValve(valve)
+            sleep(nSeconds)
+            self.closeValves()
+
+    def __statusthreads__(self):
+        '''Report on watering jobs '''
+        threads = threading.enumerate()
+        jobs = 0
+        for thrd in threads:
+            if str(thrd.getName()) == 'water':
+                jobs += 1
+
+        if jobs == 0:
+            return 'No watering jobs currently active'
+        else:
+            msg = '1 watering job is active '
+
+        if jobs == 2:
+            msg = msg + 'and 1 is queued up'
+        elif jobs > 2:
+            msg = msg + 'and ' + str(jobs-1) + ' are queued up'
+
+        return msg
 
     def logReading(self):
         """ Append data to the log file"""

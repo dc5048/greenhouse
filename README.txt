@@ -21,9 +21,9 @@ See "manual_start.py" for initializing the board for manual use, with "g" as the
 g.openSingleValve(g.RAISEDBEDS)
 
 # Close all valves
-g.openSingleValve(0)
+g.closeValves()
 
-# Water the greenhouse for 30 minutes
+# Water the greenhouse for 30 minutes (valves closed automatically when timer expires)
 g.openSingleValveOnTimer(g.GREENHOUSE,30*60)
 
 # Log a temperature/humidity reading from the sensor
